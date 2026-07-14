@@ -1,0 +1,49 @@
+name: Build Bootstrap
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: Set Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_14.3.1.app
+
+      - name: Install Theos (roothide)
+        run: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/roothide/theos/master/bin/install-theos)"
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Dobby
+        run: |
+          git clone --depth 1 https://github.com/jmpews/Dobby.git ../Dobby-master
+          cd ../Dobby-master
+          python3 scripts/platform_builder.py --platform iphoneos --arch all --library_build_type static
+
+      - name: Build basebin
+        run: |
+          cd basebin
+          ./build.sh
+
+      - name: Copy basebin to app
+        run: |
+          mkdir -p Bootstrap/basebin
+          cp -a basebin/.build/ Bootstrap/basebin/
+
+      - name: Build tipa
+        run: |
+          make package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bootstrap
+          path: packages/Bootstrap.tipa
